@@ -667,6 +667,57 @@ async def get_orders():
     orders.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
     return orders
 
+import razorpay
+import os
+from fastapi import HTTPException
+
+# Add these to your environment variables or config
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_live_0rqOQVENFQZmu6")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "9tJzklMqz7wOriORDLpzK7bM")
+
+# Initialize Razorpay client
+razorpay_client = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+
+# Add these endpoints to your main.py
+
+@app.post("/create-razorpay-order")
+async def create_razorpay_order(amount_data: dict):
+    try:
+        # Create order in Razorpay
+        order = razorpay_client.order.create({
+            'amount': amount_data['amount'],  # Amount in paise
+            'currency': amount_data['currency'],
+            'payment_capture': '1'  # Auto capture payment
+        })
+        
+        return {
+            "id": order["id"],
+            "amount": order["amount"],
+            "currency": order["currency"],
+            "key_id": RAZORPAY_KEY_ID
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/verify-payment")
+async def verify_payment(payment_data: dict):
+    try:
+        # Verify payment signature
+        params_dict = {
+            'razorpay_order_id': payment_data['razorpay_order_id'],
+            'razorpay_payment_id': payment_data['razorpay_payment_id'],
+            'razorpay_signature': payment_data['razorpay_signature']
+        }
+        
+        # Verify signature
+        razorpay_client.utility.verify_payment_signature(params_dict)
+        
+        return {"status": "success", "message": "Payment verified successfully"}
+    except razorpay.errors.SignatureVerificationError:
+        raise HTTPException(status_code=400, detail="Invalid signature")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # --------------------
 # Keep uvicorn debug run for standalone
 # --------------------
