@@ -13,6 +13,9 @@ from pymongo.errors import DuplicateKeyError
 import traceback
 from fastapi import Response
 import json
+import razorpay
+import os
+from fastapi import HTTPException
 
 
 
@@ -666,10 +669,6 @@ async def get_orders():
                 orders.append(order_data)
     orders.sort(key=lambda x: x.get("created_at", datetime.min), reverse=True)
     return orders
-
-import razorpay
-import os
-from fastapi import HTTPException
 
 # Add these to your environment variables or config
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_live_0rqOQVENFQZmu6")
