@@ -1,7 +1,6 @@
 fastapi
-uvicorn
-motor
-pydantic
-python-dotenv
+uvicorn[standard]
 pymongo
+motor
+python-dotenv
 razorpay

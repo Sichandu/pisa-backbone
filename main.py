@@ -88,6 +88,12 @@ class OrderModel(BaseModel):
     status: Optional[str] = "Ordered"
     # address fields may be included
 
+class PaymentMethodRequest(BaseModel):
+    payment_method: str
+    amount: Optional[float] = 0
+    cart_id: Optional[str] = None
+    timestamp: Optional[str] = None
+
 # --------------------
 # Startup: indexes
 # --------------------
@@ -479,21 +485,51 @@ async def get_carts():
 # --------------------
 # Payment endpoints
 # --------------------
+# @app.post("/api/payment-method")
+# async def save_payment_method(request: PaymentMethodRequest):
+#     if request.payment_method not in ["prepaid", "cod"]:
+#         raise HTTPException(status_code=400, detail="Invalid payment method")
+
+#     # 👉 Get latest pisa_code
+#     latest_user = await orders_collection.find_one(sort=[("_id", -1)])
+#     pisa_code = latest_user.get("pisa_code") or latest_user.get("user_code") if latest_user else None
+
+#     doc = {
+#         "payment_method": request.payment_method, 
+#         "timestamp": datetime.utcnow(),
+#         "user_code": pisa_code
+#     }
+#     result = await payment_collection.insert_one(doc)
+#     return {"status": "success", "payment_id": str(result.inserted_id)}
 @app.post("/api/payment-method")
 async def save_payment_method(request: PaymentMethodRequest):
     if request.payment_method not in ["prepaid", "cod"]:
         raise HTTPException(status_code=400, detail="Invalid payment method")
 
-    # 👉 Get latest pisa_code
+    # Get latest pisa_code
     latest_user = await orders_collection.find_one(sort=[("_id", -1)])
     pisa_code = latest_user.get("pisa_code") or latest_user.get("user_code") if latest_user else None
 
     doc = {
         "payment_method": request.payment_method, 
+        "amount": request.amount,
+        "cart_id": request.cart_id,
         "timestamp": datetime.utcnow(),
         "user_code": pisa_code
     }
     result = await payment_collection.insert_one(doc)
+    
+    # Also update the cart with payment information
+    if request.cart_id:
+        try:
+            cart_oid = ObjectId(request.cart_id)
+            await carts_collection.update_one(
+                {"_id": cart_oid}, 
+                {"$set": {"payment_method": request.payment_method, "payment_status": "completed"}}
+            )
+        except Exception as e:
+            print(f"Error updating cart payment info: {e}")
+    
     return {"status": "success", "payment_id": str(result.inserted_id)}
 
 @app.get("/payments")
